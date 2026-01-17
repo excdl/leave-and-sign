@@ -185,17 +185,16 @@ async function login(){
 }
 
 function logout(){
-  loginCode=''; 
-  userRole=''; 
-  approverName=''; 
-  statusFilter='未簽核';
+  // 清空登入資訊（可留或不留，反正會離開頁面）
+  loginCode = '';
+  userRole = '';
+  approverName = '';
+  statusFilter = '未簽核';
 
-  loginBox.style.display='block';
-  mainCard.style.display='none';
-  document.getElementById('tbody').innerHTML='';
-
-  // 👇 導向指定網頁
-  window.location.href = 'https://script.google.com/macros/s/AKfycby0LKPaGXcDtuQqDfH3zlMzsBxLkBAibpx9tiqSmuRDoSUb9FJnFfzlHAozsne4YND0/exec';
+  // 直接導向指定網頁（不回登入頁）
+  window.location.replace(
+    'https://script.google.com/macros/s/AKfycby0LKPaGXcDtuQqDfH3zlMzsBxLkBAibpx9tiqSmuRDoSUb9FJnFfzlHAozsne4YND0/exec'
+  );
 }
 
 function setStatus(s){
