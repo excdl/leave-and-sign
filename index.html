@@ -161,28 +161,26 @@ tr:hover { background:#f1f1f1; cursor:pointer; }
 </div>
 
 <script>
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwNVSxLimBnbPiSeAb2z85J7XkRAcTpOGoGfOqTt1jWdAvoC1zexIsxhmn-1dxX7XiGoA/exec';
-let loginCode='', userRole='', approverName='', statusFilter='未簽核';
-let leaveDataList = [], currentKey=null, currentLevel=null;
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxeTN8cA3_ZmMZymP46DcPAjGVeh1Jbm28QOa6hk8gJPwmqiBYx_DIXp1lraoeIDe8SYw/exec'; // 改成你的 Google Apps Script Web App URL
 
-const loginBox = document.getElementById('loginBox');
-const mainCard = document.getElementById('mainCard');
+let loginCode='', userRole='', approverName='', statusFilter='未簽核';
+let currentKey=null, currentLevel=null;
+
 loginBox.style.display='block';
 mainCard.style.display='none';
 
-// -------------------- 登入 --------------------
 async function login(){
   const code = document.getElementById('loginCode').value.trim();
   if(!code) return alert('請輸入代碼');
 
-  try{
+  try {
     const res = await fetch(WEB_APP_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'checkLogin', code})
-    }).then(r=>r.json());
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ action: 'checkLogin', code })
+    }).then(r => r.json());
 
-    if(!res || !res.role) return alert('代碼無效');
+    if(!res) return alert('代碼無效');
 
     loginCode = code;
     userRole = res.role;
@@ -190,62 +188,64 @@ async function login(){
     loginBox.style.display='none';
     mainCard.style.display='block';
     setStatus('未簽核');
-  } catch(err){
-    console.error(err);
+  } catch(e) {
+    console.error(e);
     alert('登入失敗，請稍後再試');
   }
 }
 
-// -------------------- 登出 --------------------
+
 function logout(){
+  // 清空登入資訊（可留或不留，反正會離開頁面）
   loginCode = '';
   userRole = '';
   approverName = '';
   statusFilter = '未簽核';
-  location.reload();
+
+  // 直接導向指定網頁（不回登入頁）
+  window.location.replace(
+    'https://script.google.com/macros/s/AKfycbzVdiOHNMUb8PdCXBw5T09Caf9aX1RgcIsQpulu03GYYWV_ovjDnfJ6_hPUXynr41rHIg/exec'
+  );
 }
 
-// -------------------- 狀態篩選 --------------------
 function setStatus(s){
-  statusFilter = s;
+  statusFilter=s;
   document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));
   if(s==='ALL') btnAll.classList.add('active');
   if(s==='未簽核') btnPending.classList.add('active');
   if(s==='簽核中') btnProcessing.classList.add('active');
   if(s==='已簽核') btnDone.classList.add('active');
+  const btn=document.querySelector(`.filters button.active`);
+  btn.scrollIntoView({behavior:'smooth', inline:'center'});
   loadData();
 }
 
-// -------------------- 載入資料 --------------------
 async function loadData(){
-  try{
+  try {
     const res = await fetch(WEB_APP_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'getLeaveData', code:loginCode})
-    }).then(r=>r.json());
-    leaveDataList = res.list || [];
-    updateFilterCounts(res.count);
-    renderTable();
-  } catch(err){
-    console.error(err);
-    alert('資料載入失敗');
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ action:'getLeaveData', code: loginCode })
+    }).then(r => r.json());
+
+    btnAll.textContent=`全部 (${res.count.ALL})`;
+    btnPending.textContent=`未簽核 (${res.count['未簽核']})`;
+    btnProcessing.textContent=`簽核中 (${res.count['簽核中']})`;
+    btnDone.textContent=`已簽核 (${res.count['已簽核']})`;
+    loadListOnly(res.list);
+  } catch(e){
+    console.error(e);
+    alert('讀取資料失敗');
   }
 }
 
-function updateFilterCounts(count){
-  btnAll.textContent = `全部 (${count.ALL})`;
-  btnPending.textContent = `未簽核 (${count['未簽核']})`;
-  btnProcessing.textContent = `簽核中 (${count['簽核中']})`;
-  btnDone.textContent = `已簽核 (${count['已簽核']})`;
-}
 
-// -------------------- 渲染表格 --------------------
-function renderTable(){
+function loadListOnly(list){
   const tbody = document.getElementById('tbody');
   tbody.innerHTML='';
-  leaveDataList.filter(r=>statusFilter==='ALL'||r.status===statusFilter).forEach(r=>{
+  list.filter(r=>statusFilter==='ALL'||r.status===statusFilter).forEach(r=>{
     const tr = document.createElement('tr');
+    const badge = `<span class="badge ${r.colorClass}" onclick="setStatus('${r.status}')">${r.status}</span>`;
     tr.innerHTML=`
       <td>${r.applyDate}</td>
       <td>${r.userName}</td>
@@ -253,76 +253,59 @@ function renderTable(){
       <td>${r.startDate} ${r.startTime}</td>
       <td>${r.endDate} ${r.endTime}</td>
       <td>${r.hours}</td>
-      <td><span class="badge ${r.colorClass}" onclick="setStatus('${r.status}')">${r.status}</span></td>
+      <td>${badge}</td>
     `;
-    const canApprove = (userRole==='督導' && !r.approval1) || (userRole==='總督導' && r.approval1 && !r.approval2);
-    if(canApprove){
+    // 督導/總督導分級核准
+    if((userRole==='督導' && !r.approval1) || (userRole==='總督導' && r.approval1 && !r.approval2)){
       tr.style.cursor='pointer';
-      tr.onclick = ()=>openModal(r);
-    } else {
-      tr.style.cursor='default';
+      tr.onclick=()=>openModal(r);
     }
     tbody.appendChild(tr);
   });
 }
 
-// -------------------- Modal --------------------
-const overlay = document.getElementById('overlay');
-const modal = document.getElementById('modal');
-const modalName = document.getElementById('modalName');
-const modalType = document.getElementById('modalType');
-const modalStart = document.getElementById('modalStart');
-const modalEnd = document.getElementById('modalEnd');
-const modalHours = document.getElementById('modalHours');
-const modalReason = document.getElementById('modalReason');
-
 function openModal(r){
-  currentKey = r.keyId;
-  currentLevel = (r.approval1 && userRole==='總督導')?2:1;
-  modalName.textContent = r.userName;
-  modalType.textContent = r.leaveType;
-  modalStart.textContent = r.startDate+' '+r.startTime;
-  modalEnd.textContent = r.endDate+' '+r.endTime;
-  modalHours.textContent = r.hours;
-  modalReason.textContent = r.reason||'';
-  overlay.style.display = modal.style.display = 'block';
+  currentKey=r.keyId;
+  currentLevel=(r.approval1 && userRole==='總督導')?2:1;
+  modalName.textContent=r.userName;
+  modalType.textContent=r.leaveType;
+  modalStart.textContent=r.startDate+' '+r.startTime;
+  modalEnd.textContent=r.endDate+' '+r.endTime;
+  modalHours.textContent=r.hours;
+  modalReason.textContent=r.reason||'';
+  overlay.style.display=modal.style.display='block';
 }
 
 function closeModal(){
-  overlay.style.display = modal.style.display = 'none';
+  overlay.style.display=modal.style.display='none';
 }
 
-// -------------------- 送出簽核 --------------------
 async function submit(ok){
-  if(!currentKey) return;
+  try {
+    const params = new URLSearchParams();
+    params.append('action','updateLeaveApproval');
+    params.append('keyId',currentKey);
+    params.append('level',currentLevel);
+    params.append('approver',approverName);
+    params.append('status',ok?'核准':'不准');
 
-  try{
     const res = await fetch(WEB_APP_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        action:'updateLeaveApproval',
-        keyId: currentKey,
-        level: currentLevel,
-        approver: approverName,
-        status: ok?'核准':'不准'
-      })
-    }).then(r=>r.json());
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    }).then(r => r.json());
+
     alert(res.message || '簽核完成');
     closeModal();
-
-    // 即時更新該筆資料
-    const idx = leaveDataList.findIndex(r=>r.keyId===currentKey);
-    if(idx>-1){
-      leaveDataList[idx].status = (currentLevel===2 || ok)?'已簽核':'簽核中';
-      leaveDataList[idx][currentLevel===1?'approval1':'approval2'] = approverName;
-      leaveDataList[idx].colorClass = (currentLevel===2 || ok)?'badge-已簽核':'badge-簽核中';
-    }
-    renderTable();
-  } catch(err){
-    console.error(err);
-    alert('簽核失敗，請稍後再試');
+    loadData();
+  } catch(e){
+    console.error(e);
+    alert('簽核失敗');
   }
+}
+
+  closeModal();
+  loadData();
 }
 </script>
 </body>
