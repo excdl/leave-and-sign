@@ -161,11 +161,12 @@ tr:hover { background:#f1f1f1; cursor:pointer; }
 </div>
 
 <script>
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzS8VE_tdpSWDqD9Vc_-O-x7wqhswJeij9RWaHfI1UN-fyjPG4aeMnZHfGWoraSvFrmsA/exec';
-
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxv2G9IL9CxCgYzKtMwUdgltBDjaDozUyeVrav5uz8Fak6HmyFBzFJNBk5dvrW-s1P5PQ/exec';
 let loginCode='', userRole='', approverName='', statusFilter='未簽核';
-let currentKey=null, currentLevel=null;
+let leaveDataList = [], currentKey=null, currentLevel=null;
 
+const loginBox = document.getElementById('loginBox');
+const mainCard = document.getElementById('mainCard');
 loginBox.style.display='block';
 mainCard.style.display='none';
 
@@ -176,8 +177,8 @@ async function login(){
 
   try{
     const res = await fetch(WEB_APP_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'checkLogin', code})
     }).then(r=>r.json());
 
@@ -201,7 +202,7 @@ function logout(){
   userRole = '';
   approverName = '';
   statusFilter = '未簽核';
-  window.location.replace('https://script.google.com/macros/s/AKfycbVdiOHNMUb8PdCXBw5T09Caf9aX1RgcIsQpulu03GYYWV_ovjDnfJ6_hPUXynr41rHIg/exec');
+  location.reload();
 }
 
 // -------------------- 狀態篩選 --------------------
@@ -212,17 +213,17 @@ function setStatus(s){
   if(s==='未簽核') btnPending.classList.add('active');
   if(s==='簽核中') btnProcessing.classList.add('active');
   if(s==='已簽核') btnDone.classList.add('active');
-
-  document.querySelector('.filters button.active').scrollIntoView({behavior:'smooth', inline:'center'});
   loadData();
 }
 
 // -------------------- 載入資料 --------------------
-let leaveDataList = [];
-
 async function loadData(){
   try{
-    const res = await fetch(`${WEB_APP_URL}?action=getLeaveData&code=${loginCode}`).then(r=>r.json());
+    const res = await fetch(WEB_APP_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'getLeaveData', code:loginCode})
+    }).then(r=>r.json());
     leaveDataList = res.list || [];
     updateFilterCounts(res.count);
     renderTable();
@@ -242,48 +243,48 @@ function updateFilterCounts(count){
 // -------------------- 渲染表格 --------------------
 function renderTable(){
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML = '';
-
-  leaveDataList
-    .filter(r=>statusFilter==='ALL' || r.status===statusFilter)
-    .forEach(r=>{
-      const tr = document.createElement('tr');
-
-      tr.innerHTML = `
-        <td>${r.applyDate}</td>
-        <td>${r.userName}</td>
-        <td>${r.leaveType}</td>
-        <td>${r.startDate} ${r.startTime}</td>
-        <td>${r.endDate} ${r.endTime}</td>
-        <td>${r.hours}</td>
-        <td><span class="badge ${r.colorClass}" onclick="setStatus('${r.status}')">${r.status}</span></td>
-      `;
-
-      // 判斷是否可點開 Modal（督導 / 總督導分級核准）
-      const canApprove = (userRole==='督導' && !r.approval1) || 
-                         (userRole==='總督導' && r.approval1 && !r.approval2);
-
-      if(canApprove){
-        tr.style.cursor='pointer';
-        tr.onclick = ()=>openModal(r);
-      } else {
-        tr.style.cursor='default';
-      }
-
-      tbody.appendChild(tr);
-    });
+  tbody.innerHTML='';
+  leaveDataList.filter(r=>statusFilter==='ALL'||r.status===statusFilter).forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML=`
+      <td>${r.applyDate}</td>
+      <td>${r.userName}</td>
+      <td>${r.leaveType}</td>
+      <td>${r.startDate} ${r.startTime}</td>
+      <td>${r.endDate} ${r.endTime}</td>
+      <td>${r.hours}</td>
+      <td><span class="badge ${r.colorClass}" onclick="setStatus('${r.status}')">${r.status}</span></td>
+    `;
+    const canApprove = (userRole==='督導' && !r.approval1) || (userRole==='總督導' && r.approval1 && !r.approval2);
+    if(canApprove){
+      tr.style.cursor='pointer';
+      tr.onclick = ()=>openModal(r);
+    } else {
+      tr.style.cursor='default';
+    }
+    tbody.appendChild(tr);
+  });
 }
 
 // -------------------- Modal --------------------
+const overlay = document.getElementById('overlay');
+const modal = document.getElementById('modal');
+const modalName = document.getElementById('modalName');
+const modalType = document.getElementById('modalType');
+const modalStart = document.getElementById('modalStart');
+const modalEnd = document.getElementById('modalEnd');
+const modalHours = document.getElementById('modalHours');
+const modalReason = document.getElementById('modalReason');
+
 function openModal(r){
   currentKey = r.keyId;
   currentLevel = (r.approval1 && userRole==='總督導')?2:1;
   modalName.textContent = r.userName;
   modalType.textContent = r.leaveType;
-  modalStart.textContent = r.startDate + ' ' + r.startTime;
-  modalEnd.textContent = r.endDate + ' ' + r.endTime;
+  modalStart.textContent = r.startDate+' '+r.startTime;
+  modalEnd.textContent = r.endDate+' '+r.endTime;
   modalHours.textContent = r.hours;
-  modalReason.textContent = r.reason || '';
+  modalReason.textContent = r.reason||'';
   overlay.style.display = modal.style.display = 'block';
 }
 
@@ -295,44 +296,35 @@ function closeModal(){
 async function submit(ok){
   if(!currentKey) return;
 
-  // 取得完整時間
-  const now = new Date();
-  const timestamp = now.getFullYear() + '-' +
-                    String(now.getMonth()+1).padStart(2,'0') + '-' +
-                    String(now.getDate()).padStart(2,'0') + ' ' +
-                    String(now.getHours()).padStart(2,'0') + ':' +
-                    String(now.getMinutes()).padStart(2,'0') + ':' +
-                    String(now.getSeconds()).padStart(2,'0');
-
-  const params = new URLSearchParams({
-    action: 'updateLeaveApproval',
-    keyId: currentKey,
-    level: currentLevel,
-    approver: approverName,
-    status: ok?'核准':'不准',
-    timestamp
-  });
-
   try{
-    const res = await fetch(`${WEB_APP_URL}?${params.toString()}`).then(r=>r.json());
+    const res = await fetch(WEB_APP_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action:'updateLeaveApproval',
+        keyId: currentKey,
+        level: currentLevel,
+        approver: approverName,
+        status: ok?'核准':'不准'
+      })
+    }).then(r=>r.json());
     alert(res.message || '簽核完成');
     closeModal();
 
-    // 只更新這筆資料的狀態，不必重抓全部
+    // 即時更新該筆資料
     const idx = leaveDataList.findIndex(r=>r.keyId===currentKey);
     if(idx>-1){
-      leaveDataList[idx].status = ok?'已簽核':'不准';
-      leaveDataList[idx][currentLevel===1?'approval1':'approval2'] = timestamp;
-      leaveDataList[idx].colorClass = ok?'badge-已簽核':'badge-未簽核';
+      leaveDataList[idx].status = (currentLevel===2 || ok)?'已簽核':'簽核中';
+      leaveDataList[idx][currentLevel===1?'approval1':'approval2'] = approverName;
+      leaveDataList[idx].colorClass = (currentLevel===2 || ok)?'badge-已簽核':'badge-簽核中';
     }
     renderTable();
-
   } catch(err){
     console.error(err);
     alert('簽核失敗，請稍後再試');
   }
 }
 </script>
-
 </body>
 </html>
+
