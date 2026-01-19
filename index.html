@@ -161,7 +161,7 @@ tr:hover { background:#f1f1f1; cursor:pointer; }
 </div>
 
 <script>
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxeTN8cA3_ZmMZymP46DcPAjGVeh1Jbm28QOa6hk8gJPwmqiBYx_DIXp1lraoeIDe8SYw/exec'; // 改成你的 Google Apps Script Web App URL
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzS8VE_tdpSWDqD9Vc_-O-x7wqhswJeij9RWaHfI1UN-fyjPG4aeMnZHfGWoraSvFrmsA/exec'; // 改成你的 Google Apps Script Web App URL
 
 let loginCode='', userRole='', approverName='', statusFilter='未簽核';
 let currentKey=null, currentLevel=null;
@@ -173,27 +173,16 @@ async function login(){
   const code = document.getElementById('loginCode').value.trim();
   if(!code) return alert('請輸入代碼');
 
-  try {
-    const res = await fetch(WEB_APP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ action: 'checkLogin', code })
-    }).then(r => r.json());
+  const res = await fetch(`${WEB_APP_URL}?action=checkLogin&code=${code}`).then(r=>r.json());
+  if(!res) return alert('代碼無效');
 
-    if(!res) return alert('代碼無效');
-
-    loginCode = code;
-    userRole = res.role;
-    approverName = res.approverName;
-    loginBox.style.display='none';
-    mainCard.style.display='block';
-    setStatus('未簽核');
-  } catch(e) {
-    console.error(e);
-    alert('登入失敗，請稍後再試');
-  }
+  loginCode = code;
+  userRole = res.role;
+  approverName = res.approverName;
+  loginBox.style.display='none';
+  mainCard.style.display='block';
+  setStatus('未簽核');
 }
-
 
 function logout(){
   // 清空登入資訊（可留或不留，反正會離開頁面）
@@ -221,24 +210,13 @@ function setStatus(s){
 }
 
 async function loadData(){
-  try {
-    const res = await fetch(WEB_APP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ action:'getLeaveData', code: loginCode })
-    }).then(r => r.json());
-
-    btnAll.textContent=`全部 (${res.count.ALL})`;
-    btnPending.textContent=`未簽核 (${res.count['未簽核']})`;
-    btnProcessing.textContent=`簽核中 (${res.count['簽核中']})`;
-    btnDone.textContent=`已簽核 (${res.count['已簽核']})`;
-    loadListOnly(res.list);
-  } catch(e){
-    console.error(e);
-    alert('讀取資料失敗');
-  }
+  const res = await fetch(`${WEB_APP_URL}?action=getLeaveData&code=${loginCode}`).then(r=>r.json());
+  btnAll.textContent=`全部 (${res.count.ALL})`;
+  btnPending.textContent=`未簽核 (${res.count['未簽核']})`;
+  btnProcessing.textContent=`簽核中 (${res.count['簽核中']})`;
+  btnDone.textContent=`已簽核 (${res.count['已簽核']})`;
+  loadListOnly(res.list);
 }
-
 
 function loadListOnly(list){
   const tbody = document.getElementById('tbody');
@@ -281,33 +259,18 @@ function closeModal(){
 }
 
 async function submit(ok){
-  try {
-    const params = new URLSearchParams();
-    params.append('action','updateLeaveApproval');
-    params.append('keyId',currentKey);
-    params.append('level',currentLevel);
-    params.append('approver',approverName);
-    params.append('status',ok?'核准':'不准');
+  const params = new URLSearchParams();
+  params.append('action','updateLeaveApproval');
+  params.append('keyId',currentKey);
+  params.append('level',currentLevel);
+  params.append('approver',approverName);
+  params.append('status',ok?'核准':'不准');
 
-    const res = await fetch(WEB_APP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params
-    }).then(r => r.json());
-
-    alert(res.message || '簽核完成');
-    closeModal();
-    loadData();
-  } catch(e){
-    console.error(e);
-    alert('簽核失敗');
-  }
-}
-
+  const res = await fetch(`${WEB_APP_URL}?${params.toString()}`).then(r=>r.json());
+  alert(res.message || '簽核完成');
   closeModal();
   loadData();
 }
 </script>
 </body>
 </html>
-
