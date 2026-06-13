@@ -57,7 +57,12 @@
     tr { background:#fff; margin-bottom:12px; padding:15px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.05); }
     td { display:flex; justify-content:space-between; padding:6px 0; border:none; }
     td::before { content:attr(data-label); font-weight:bold; color:#555; }
-    .btn-action { padding: 20px 0; font-size: 1.2rem; }
+    
+    /* === 手機版簽核按鈕加大 50% === */
+    .btn-approve, .btn-reject {
+      padding: 21px; /* 原為 14px，加大 50% 約為 21px */
+      font-size: 1.1em; /* 稍微調大字體以保持視覺協調 */
+    }
   }
 </style>
 </head>
@@ -100,7 +105,7 @@
 </div>
 
 <script>
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyFWNtAQR9v3p8mF34l86sG5PL6V_6ABf2PMTJoOa_AbTW0mUEKC_4KDuSU1q87pwweCg/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyVOU1WCWNCVyTjW-kkHv7Yds0wOKopZnuxIzVgPxAj_5eDbWWCTloD2zdiJ1ATVA9u8w/exec';
 let loginCode='', userRole='', approverName='', statusFilter='未簽核', allData=[];
 let currentKey=null, currentLevel=null;
 
