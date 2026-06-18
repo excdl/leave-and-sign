@@ -190,13 +190,33 @@ function setStatus(s){
 function renderTable(){
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
-  allData.forEach(r=>{
-    if(statusFilter !== 'ALL' && r.status !== statusFilter) return;
+
+  // 先過濾 + 再排序（新 → 舊）
+  const filtered = allData
+    .filter(r => statusFilter === 'ALL' || r.status === statusFilter)
+    .sort((a, b) => {
+      // 組合日期時間（避免只有日期排序不準）
+      const dateA = new Date(`${a.applyDate} ${a.startTime || ''}`);
+      const dateB = new Date(`${b.applyDate} ${b.startTime || ''}`);
+      return dateB - dateA; // 新的在前
+    });
+
+  filtered.forEach(r => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td data-label="姓名">${r.userName}</td><td data-label="日期">${r.applyDate}</td><td data-label="假別">${r.leaveType}</td><td data-label="時間">${r.startTime}~${r.endTime}</td><td data-label="時數">${r.hours}</td><td data-label="狀態"><span class="badge badge-${r.status}">${r.status}</span></td>`;
-    if((userRole==='督導' && !r.approval1) || (userRole==='總督導' && r.approval1 && !r.approval2)){
+    tr.innerHTML = `
+      <td data-label="姓名">${r.userName}</td>
+      <td data-label="日期">${r.applyDate}</td>
+      <td data-label="假別">${r.leaveType}</td>
+      <td data-label="時間">${r.startTime}~${r.endTime}</td>
+      <td data-label="時數">${r.hours}</td>
+      <td data-label="狀態"><span class="badge badge-${r.status}">${r.status}</span></td>
+    `;
+
+    if ((userRole==='督導' && !r.approval1) ||
+        (userRole==='總督導' && r.approval1 && !r.approval2)) {
       tr.onclick = () => openModal(r);
     }
+
     tbody.appendChild(tr);
   });
 }
