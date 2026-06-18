@@ -110,6 +110,8 @@
     <h3>請假簽核系統</h3>
     <button class="closeBtn-round" onclick="logout()">×</button>
   </div>
+  <input id="nameSearch" type="text" placeholder="搜尋姓名..." 
+  oninput="renderTable()" style="padding:8px;margin-bottom:10px;width:100%;border-radius:8px;border:1px solid #ccc;">  
   <div class="filters">
     <button id="btnAll" onclick="setStatus('ALL')">全部</button>
     <button id="btnPending" onclick="setStatus('未簽核')">未簽核</button>
@@ -139,7 +141,7 @@
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyVOU1WCWNCVyTjW-kkHv7Yds0wOKopZnuxIzVgPxAj_5eDbWWCTloD2zdiJ1ATVA9u8w/exec';
 let loginCode='', userRole='', approverName='', statusFilter='未簽核', allData=[];
 let currentKey=null, currentLevel=null;
-
+let nameKeyword = '';
 async function login(){
   const btn = document.querySelector('#loginBox button');
   const code = document.getElementById('loginCode').value.trim();
@@ -191,15 +193,17 @@ function renderTable(){
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
 
-  // 先過濾 + 再排序（新 → 舊）
   const filtered = allData
-    .filter(r => statusFilter === 'ALL' || r.status === statusFilter)
-    .sort((a, b) => {
-      // 組合日期時間（避免只有日期排序不準）
-      const dateA = new Date(`${a.applyDate} ${a.startTime || ''}`);
-      const dateB = new Date(`${b.applyDate} ${b.startTime || ''}`);
-      return dateB - dateA; // 新的在前
-    });
+  .filter(r => {
+    const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
+    const matchName = !nameKeyword || r.userName.includes(nameKeyword);
+    return matchStatus && matchName;
+  })
+  .sort((a, b) => {
+    const dateA = new Date(`${a.applyDate} ${a.startTime || ''}`);
+    const dateB = new Date(`${b.applyDate} ${b.startTime || ''}`);
+    return dateB - dateA;
+  });
 
   filtered.forEach(r => {
     const tr = document.createElement('tr');
@@ -247,6 +251,10 @@ async function submit(ok, btn) {
     container.querySelectorAll('button').forEach(b => b.disabled = false);
   }
 }
+  document.getElementById('nameSearch').addEventListener('input', e => {
+  nameKeyword = e.target.value.trim();
+  renderTable();
+});
 </script>
 </body>
 </html>
